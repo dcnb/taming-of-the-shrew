@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" class="h-100">
+  <head prefix="og: http://ogp.me/ns#">
+    {% include dramaturgy/head/head.html %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    {{google-font-cdn}}
+  </head>
+  <body class="d-flex flex-column h-100">
+    <div id="skip-to-content"><a href="#maincontent">Skip to main content</a></div>
+       {% if site.development-mode %}
+       {% include dramaturgy/collection-nav.html %}
+       {% include dramaturgy/setup/modal-body.html %}
+    {% endif %}
+
+    <main id="maincontent" role="main" class="flex-shrink-0">
+      {% capture style %}dramaturgy/covers/{{site.data.theme.cover-style | default: 'minimal' }}.html{% endcapture %}
+
+      {% include {{style}} %}
+    </main>
+    {% include dramaturgy/foot.html %}
+    {% include foot.html %}
+  </body>
+</html>

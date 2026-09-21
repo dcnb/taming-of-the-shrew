@@ -1,0 +1,500 @@
+<script>
+/* 
+ * Session Storage Management for Jekyll Play Display
+ * Handles loading data from CSV sources and maintaining UI consistency
+ */
+
+// Initialize global variables
+let dd_items = [];
+let dd_scenes = [];
+let dd_characters = [];
+let scenesNav = [];
+
+// Default configuration
+const default_csv_url = "{{ site.play | relative_url }}";
+
+// Get the current metadata set or use the configured default
+const dd_metadata_csv = sessionStorage.getItem("dd_metadata_csv") || default_csv_url;
+
+// Update the metadata menu display when page loads
+document.addEventListener('DOMContentLoaded', function() {
+  initializeData();
+  
+  // Update Modal with current metadata source
+  const metadataCSV = document.getElementById("current-metadata-csv");
+  if (metadataCSV) {
+    metadataCSV.innerHTML = dd_metadata_csv ? dd_metadata_csv : "None!";
+  }
+  
+  // Check URL parameters for modal=false flag
+  const urlParams = new URLSearchParams(window.location.search);
+  const suppressModal = urlParams.get('modal') === 'false';
+  
+  // Check if default_csv_url is empty and open setup modal if needed
+  // Only show modal if suppressModal is false and page.modal is not false
+  {% unless page.modal == false %}
+  if (!suppressModal && 
+      (!dd_metadata_csv || dd_metadata_csv.trim() === "") && 
+      (!default_csv_url || default_csv_url.trim() === "")) {
+    // Check if the modal exists
+    const setupModal = document.getElementById('cbSetUpModal');
+    if (setupModal) {
+      // Use Bootstrap's modal method to show the modal
+      const bsModal = new bootstrap.Modal(setupModal);
+      bsModal.show();
+    }
+  }
+  {% endunless %}
+});
+
+/**
+ * Main initialization function to determine data source and load appropriately
+ */
+function initializeData() {
+  // Check URL parameters first
+  const urlParams = new URLSearchParams(window.location.search);
+  
+  if (urlParams.has("play") && urlParams.get("play").trim()) {
+    // Clear previous data
+    sessionStorage.removeItem('dd_items_store');
+    sessionStorage.removeItem('dd_scenes_store');
+    sessionStorage.removeItem('dd_characters_store');
+    sessionStorage.removeItem('dd_title');
+    sessionStorage.removeItem('dd_author');
+    sessionStorage.removeItem('dd_description');
+    sessionStorage.removeItem('dd_metadata_csv');
+    
+    // Get the play URL and clean it
+    let playUrl = urlParams.get("play").trim();
+    console.log("Original play URL:", playUrl);
+    
+    // Ensure the URL ends with output=csv for Google Sheets
+    if (playUrl.includes('docs.google.com') && !playUrl.includes('output=csv')) {
+      // Remove any existing query parameters
+      playUrl = playUrl.split('?')[0];
+      // Add output=csv
+      playUrl += '?output=csv';
+    }
+    
+    console.log("Processed play URL:", playUrl);
+    
+    // Use play parameter from URL
+    loadFromCSV(playUrl);
+  } 
+  else if (sessionStorage.getItem("dd_items_store")) {
+    // Use cached data from session storage
+    loadFromSessionStorage();
+  } 
+  else if (dd_metadata_csv) {
+    // Use configured metadata
+    loadFromCSV(dd_metadata_csv);
+  } 
+  else {
+    // Fallback to default
+    loadFromCSV(default_csv_url);
+  }
+}
+
+/**
+ * Load data from session storage
+ */
+function loadFromSessionStorage() {
+  dd_items = JSON.parse(sessionStorage.getItem("dd_items_store") || "[]");
+  dd_scenes = JSON.parse(sessionStorage.getItem("dd_scenes_store") || "[]");
+  dd_characters = JSON.parse(sessionStorage.getItem("dd_characters_store") || "[]");
+  
+  // If we have stored title/author/description, update UI immediately
+  const storedTitle = sessionStorage.getItem("dd_title");
+  const storedAuthor = sessionStorage.getItem("dd_author");
+  const storedDescription = sessionStorage.getItem("dd_description");
+  
+  if (storedTitle) {
+    updateUIWithMetadata(storedTitle, storedAuthor || "", storedDescription || "");
+  }
+  
+  buildScenesNavigation();
+}
+
+/**
+ * Load data from CSV source
+ */
+function loadFromCSV(source) {
+  // Don't proceed if source is empty or invalid
+  if (!source || source.trim() === "") {
+    console.warn("No valid CSV source provided");
+    const playTitle = "A Play";
+    const authorName = "";
+    const description = "";
+    updateUIWithMetadata(playTitle, authorName, description);
+    return;
+  }
+  // Store the source URL first, so it's available if we need to reload
+  sessionStorage.setItem("dd_metadata_csv", source);
+  
+  Papa.parse(source, {
+    download: true,
+    header: true,
+    complete: (results) => {
+      dd_items_init(results);
+      
+      // If we're on the script page, trigger the pageInit
+      if (typeof window.pageInit === 'function' &&
+          document.getElementById('contents-container')) {
+        window.pageInit();
+      }
+    },
+    error: (err) => {
+      console.error("Error parsing CSV:", err);
+      alert("There was an error loading the play data. Please check the CSV source.");
+    }
+  });
+}
+
+/**
+ * Process items from CSV and initialize the page
+ */
+function dd_items_init(results) {
+  // Extract play title, author, and description from data
+  const playTitle = results.data.find(item => item.play && item.play.trim() !== '')?.play || "A Play";
+  const authorName = results.data.find(item => item.author && item.author.trim() !== '')?.author || "";
+  const description = results.data.find(item => item.description && item.description.trim() !== '')?.description || "";
+  
+  console.log("Found play title:", playTitle);
+  console.log("Found author:", authorName);
+  console.log("Found description:", description);
+  
+  // Set up global data arrays
+  dd_items = results.data;
+  
+  // Extract unique act and scene combinations
+  const uniqueScenes = new Set();
+  dd_items.forEach(item => {
+    if (item.act && item.scene) {
+      uniqueScenes.add(`${item.act}.${item.scene}`);
+    }
+  });
+  dd_scenes = Array.from(uniqueScenes);
+  
+  // Extract unique characters with scene appearances and line counts
+  const characterMap = new Map();
+  dd_items.forEach(item => {
+    if (item.player && item.player.trim() !== '' && item.player.trim() !== 'StageDirection' && item.act && item.scene) {
+      const characterName = item.player.trim();
+      const sceneKey = `${item.act}.${item.scene}`;
+      
+      if (!characterMap.has(characterName)) {
+        characterMap.set(characterName, {
+          name: characterName,
+          scenes: new Set(),
+          scenesList: [],
+          scenesString: "",
+          lineCount: 0
+        });
+      }
+      
+      characterMap.get(characterName).scenes.add(sceneKey);
+      characterMap.get(characterName).lineCount++;
+    }
+  });
+  
+  // Convert to final array format
+  dd_characters = Array.from(characterMap.values()).map(character => {
+    // Convert Set to sorted array
+    character.scenesList = Array.from(character.scenes).sort((a, b) => {
+      const [actA, sceneA] = a.split('.').map(Number);
+      const [actB, sceneB] = b.split('.').map(Number);
+      if (actA !== actB) return actA - actB;
+      return sceneA - sceneB;
+    });
+    
+    // Create semicolon-separated string for compatibility
+    character.scenesString = character.scenesList.join(';');
+    
+    // Remove the Set as it's not serializable
+    delete character.scenes;
+    
+    return character;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+  
+  console.log("Found characters with scenes:", dd_characters);
+  
+  // Store data in sessionStorage
+  sessionStorage.setItem("dd_items_store", JSON.stringify(dd_items));
+  sessionStorage.setItem("dd_scenes_store", JSON.stringify(dd_scenes));
+  sessionStorage.setItem("dd_characters_store", JSON.stringify(dd_characters));
+  sessionStorage.setItem("dd_title", playTitle);
+  sessionStorage.setItem("dd_author", authorName);
+  sessionStorage.setItem("dd_description", description);
+  
+  // Update UI with the title, author, and description
+  updateUIWithMetadata(playTitle, authorName, description);
+  
+  // Build scenes navigation
+  buildScenesNavigation();
+}
+
+/**
+ * Update UI elements with the title, author, and description
+ */
+function updateUIWithMetadata(title, author, description) {
+  // Update main title element
+  const titleElement = document.getElementById("work_title");
+  if (titleElement) {
+    titleElement.innerHTML = title;
+  }
+  
+  // Update author element if it exists
+  const authorElement = document.getElementById("work_author");
+  if (authorElement && author && author.trim() !== "") {
+    authorElement.innerHTML = author;
+  } else if (authorElement) {
+    authorElement.innerHTML = "";
+    document.getElementById("by_text").style.display = "none";
+  }
+  
+  // Update description elements if they exist
+  const projectDescription = document.getElementById("project-description");
+  if (projectDescription && description && description.trim() !== "") {
+    projectDescription.innerHTML = description;
+  }
+  
+  // Update offcanvas elements
+  const offcanvasLabel = document.getElementById("offcanvasLabel");
+  if (offcanvasLabel) {
+    offcanvasLabel.innerHTML = '<a class="text-dark" href="{{ '/' | relative_url }}">' + title + '</a>';
+  }
+  
+  const offcanvasAuthor = document.getElementById("offcanvas_author");
+  if (offcanvasAuthor && author && author.trim() !== "") {
+    offcanvasAuthor.innerHTML = author;
+  } else if (offcanvasAuthor) {
+    offcanvasAuthor.innerHTML = "";
+    document.getElementById("by_text").style.display = "none";
+  }
+  
+  const offcanvasDescription = document.getElementById("offcanvas-description");
+  if (offcanvasDescription && description && description.trim() !== "") {
+    offcanvasDescription.innerHTML = description;
+  }
+}
+
+/**
+ * Build navigation for scenes dropdown
+ */
+function buildScenesNavigation() {
+  const scenesNavDropdown = document.getElementById("scenesNavDropdown");
+  const offcanvasScenesNavDropdown = document.getElementById("offcanvasScenesNavDropdown");
+  
+  if (!scenesNavDropdown && !offcanvasScenesNavDropdown) return;
+  
+  scenesNav = [];
+  const ref_url = "{{ '/script.html?scene=' | relative_url }}";
+  
+  dd_scenes.forEach(scene => {
+    const act = scene.split('.')[0];
+    const sceneNum = scene.split('.')[1];
+    const sceneClass = 'act' + act + 'scene' + sceneNum;
+    
+    scenesNav.push(
+      `<li class="border">
+        <a class="dropdown-item" href="${ref_url}${sceneClass}">
+          Act ${act}, Scene ${sceneNum}
+        </a>
+      </li>`
+    );
+  });
+  
+  // Only update if element exists
+  if (scenesNavDropdown) {
+    scenesNavDropdown.innerHTML = scenesNav.join('');
+  }
+  
+}
+
+/**
+ * Reset all stored data and reload the page
+ */
+function reset_dd_items() {
+  // First, alert user that we're resetting
+  window.alert("Session data will be reset. The page will reload.");
+  
+  // Store the default URL before clearing storage
+  const csvUrl = dd_metadata_csv || "";
+  
+  // Only clear play-related data, not ALL session storage
+  sessionStorage.removeItem('dd_items_store');
+  sessionStorage.removeItem('dd_scenes_store');
+  sessionStorage.removeItem('dd_characters_store');
+  sessionStorage.removeItem('dd_title');
+  sessionStorage.removeItem('dd_author');
+  sessionStorage.removeItem('dd_description');
+  
+  // If there's a default URL, set it in session storage
+  // Otherwise, remove any existing metadata CSV
+  if (csvUrl && csvUrl.trim() !== "") {
+    sessionStorage.setItem("dd_metadata_csv", csvUrl);
+  } else {
+    sessionStorage.removeItem("dd_metadata_csv");
+  }
+  
+  // Reload with a clean URL
+  window.location = window.location.pathname;
+}
+
+/**
+ * Parse metadata from a CSV file or URL
+ */
+function dd_items_setup(metadata_source) {
+    sessionStorage.removeItem('dd_items_store');
+    sessionStorage.removeItem('dd_scenes_store');
+    sessionStorage.removeItem('dd_characters_store');
+    sessionStorage.removeItem('dd_title');
+    sessionStorage.removeItem('dd_author');
+    sessionStorage.removeItem('dd_description');
+
+  
+  Papa.parse(metadata_source, {
+    download: true,
+    header: true,
+    complete: (results) => { 
+      // Extract items
+      dd_items = results.data;
+      
+      // Extract unique scenes
+      const uniqueScenes = new Set();
+      dd_items.forEach(item => {
+        if (item.act && item.scene) {
+          uniqueScenes.add(`${item.act}.${item.scene}`);
+        }
+      });
+      dd_scenes = Array.from(uniqueScenes);
+      
+      // Extract unique characters with scene appearances
+      const characterMap = new Map();
+      dd_items.forEach(item => {
+        if (item.player && item.player.trim() !== '' && item.player.trim() !== 'StageDirection' && item.act && item.scene) {
+          const characterName = item.player.trim();
+          const sceneKey = `${item.act}.${item.scene}`;
+          
+          if (!characterMap.has(characterName)) {
+            characterMap.set(characterName, {
+              name: characterName,
+              scenes: new Set(),
+              scenesList: [],
+              scenesString: ""
+            });
+          }
+          
+          characterMap.get(characterName).scenes.add(sceneKey);
+        }
+      });
+      
+      // Convert to final array format
+      dd_characters = Array.from(characterMap.values()).map(character => {
+        // Convert Set to sorted array
+        character.scenesList = Array.from(character.scenes).sort((a, b) => {
+          const [actA, sceneA] = a.split('.').map(Number);
+          const [actB, sceneB] = b.split('.').map(Number);
+          if (actA !== actB) return actA - actB;
+          return sceneA - sceneB;
+        });
+        
+        // Create semicolon-separated string for compatibility
+        character.scenesString = character.scenesList.join(';');
+        
+        // Remove the Set as it's not serializable
+        delete character.scenes;
+        
+        return character;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+      
+      // Store in session storage
+      sessionStorage.setItem("dd_items_store", JSON.stringify(dd_items));
+      sessionStorage.setItem("dd_scenes_store", JSON.stringify(dd_scenes));
+      sessionStorage.setItem("dd_characters_store", JSON.stringify(dd_characters));
+      
+      // Store title if available
+      if (dd_items.length > 0 && dd_items[0].play) {
+        sessionStorage.setItem("dd_title", dd_items[0].play);
+      }
+
+      // Store author if available
+      if (dd_items.length > 0 && dd_items[0].author) {
+        sessionStorage.setItem("dd_author", dd_items[0].author);
+      }
+      
+      // Store description if available
+      if (dd_items.length > 0 && dd_items[0].description) {
+        sessionStorage.setItem("dd_description", dd_items[0].description);
+      }
+      
+      // Store source reference
+      sessionStorage.setItem("dd_metadata_csv", 
+        typeof metadata_source === 'string' ? metadata_source : metadata_source.name);
+      
+      // reload the page
+      window.location.reload();
+     
+    },
+    error: (err) => {
+      console.error("CSV parsing error:", err);
+      alert("There is an error parsing your CSV! Please check the configured URL or file.");
+    }
+  });
+}
+
+/**
+ * Handle local file selection for metadata
+ */
+function metadata_file_selector() {
+  const fileSelector = document.getElementById("csvFile");
+  const selectedFile = fileSelector.files[0];
+  
+  if (!selectedFile) {
+    alert("Please select a file first.");
+    return;
+  }
+  
+  // Record in session store
+  sessionStorage.setItem("dd_metadata_csv", selectedFile.name);
+  
+  // Parse the file
+  dd_items_setup(selectedFile);
+}
+
+/**
+ * Handle URL input for metadata
+ */
+function metadata_url_selector() {
+  const selectedUrl = document.getElementById("csvUrl").value;
+  
+  if (!selectedUrl || selectedUrl.trim() === '') {
+    alert("Please enter a URL first.");
+    return;
+  }
+  
+  // Record in session store
+  sessionStorage.setItem("dd_metadata_csv", selectedUrl);
+  
+  // Parse from URL
+  dd_items_setup(selectedUrl);
+}
+
+/**
+ * Handle demo selection for metadata
+ */
+function metadata_demo_selector() {
+  const selectedUrl = document.getElementById("demoUrl").value;
+  
+  if (!selectedUrl || selectedUrl.trim() === '') {
+    alert("No demo URL selected.");
+    return;
+  }
+  
+  // Record in session store
+  sessionStorage.setItem("dd_metadata_csv", selectedUrl);
+  
+  // Parse from demo URL
+  dd_items_setup(selectedUrl);
+}
+</script>

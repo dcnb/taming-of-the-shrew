@@ -1,0 +1,931 @@
+<script>
+// playscript.js - Consolidated JavaScript for play script functionality
+// Combines functionality from:
+// - lines-js.html
+// - transcript-js.html
+// - annotation-js.html
+// - Also includes markdownit renderer for annotations
+
+(function() {
+  // Initialize markdown-it for annotation rendering
+  var md = window.markdownit();
+  
+  // Global viewing mode state
+  /** @type {'cut'|'original'|'both'} */
+  var viewMode = 'cut'; // Default view mode
+  /** @type {boolean} */
+  var showBranching = true; // Default branch visualization state
+  
+  // Global flags to track if data needs comparison features
+  var hasCuttingData = false;
+  var hasRevisionData = false;
+  
+  // Counter for generating unique IDs - reset on each page load
+  var lineIdCounter = 0;
+  // Counter for spoken dialogue line numbering
+  var dialogueLineCounter = 0;
+  // Map to store annotation references 
+  var lineIdToAnnotationMap = {};
+  // Variable to track the last player
+  var lastPlayer = null;
+
+  /* LINES FUNCTIONALITY */
+  /* function to make each line to page */
+  function makeLine(obj) {
+    // Generate a unique ID for this line - simpler and more reliable than dataline
+    var uniqueLineId = 'line_' + (++lineIdCounter);
+    
+    // Store original dataline as a data attribute for backward compatibility
+    var datalineAttr = obj.dataline ? ' data-old-dataline="' + obj.dataline + '"' : '';
+    
+    // Check for cutting/revision data (without affecting flow)
+    if (obj.cutting === "TRUE") hasCuttingData = true;
+    if (obj.revision) hasRevisionData = true;
+
+    // Early return if cut and we're in cut mode (original behavior preserved)
+    if (obj.cutting === "TRUE" && viewMode === 'cut') {
+      return '';
+    }
+
+    // Handle text content - support both old format (playerline) and new format (text)
+    // Store original content for efficiency in version switching
+    var originalText = "";
+    if (obj.text !== undefined) {
+      originalText = obj.text;
+    } else if (obj.playerline !== undefined) {
+      originalText = obj.playerline;
+    }
+    
+    // Determine if this is an added line (has revision but no original text)
+    var isAddedLine = obj.revision && (!originalText || originalText.trim() === "");
+    
+    // Use revised text based on view mode
+    var playerline = originalText;
+    if (obj.revision && viewMode !== 'original') {
+      playerline = obj.revision;
+    }
+
+    // Handle annotations
+    var annotation, annoId;
+    if (obj.annotation) {
+      // Make case-insensitive check for 'ibid'
+      if (obj.annotation.toLowerCase().startsWith("ibid")) {
+        // Extract the number after "ibid", handling different formats
+        var ibidText = obj.annotation.toLowerCase();
+        var subtractingNumber;
+        
+        // Check if there's a number after "ibid"
+        var numMatch = ibidText.match(/ibid(\d+)/);
+        
+        if (numMatch && numMatch[1]) {
+          // If explicit number provided (e.g., "ibid3"), use it
+          subtractingNumber = parseInt(numMatch[1]);
+        } else {
+          // If just "ibid" with no number, default to 1 (previous line)
+          subtractingNumber = 1;
+        }
+        
+        // Calculate target line number based on current counter
+        var targetLineId = 'line_' + (lineIdCounter - subtractingNumber);
+        // Get the associated annotation ID from our map
+        annoId = lineIdToAnnotationMap[targetLineId] || 'anno_' + targetLineId;
+        var ibid = obj.annotation;
+      } else {
+        // For new annotations, create a new ID and store it in the map
+        annotation = md.renderInline(obj.annotation);
+        annoId = 'anno_' + uniqueLineId;
+        lineIdToAnnotationMap[uniqueLineId] = annoId;
+      }
+    }
+
+    // Handle highlights (unchanged but updated to use new IDs)
+    if (obj.highlight && annoId) {
+      var hilite = '<span class="hilite hi-' + annoId + '" data-filter="' + annoId + '">' + obj.highlight + '</span>';
+      playerline = playerline.replace(obj.highlight, hilite);
+      // Also apply highlight to original text for consistency
+      if (originalText !== playerline) {
+        originalText = originalText.replace(obj.highlight, hilite);
+      }
+    }
+
+    // Determine if this is a stage direction
+    var isStageDirection = obj.player === "StageDirection";
+    
+    // Increment dialogue counter only for spoken lines (not stage directions) and not cut lines
+    if (!isStageDirection && obj.cutting !== "TRUE") {
+      dialogueLineCounter++;
+    }
+
+    // Determine player class
+    if (isStageDirection) {
+      var player;
+      if (playerline && playerline.toLowerCase().startsWith("act ")) {
+        var playerClass = "StageDirection actstart act" + obj.act + "-start";
+      } else if (playerline && playerline.toLowerCase().startsWith("scene ")) {
+        var playerClass = "StageDirection scenestart";
+      } else {
+        var playerClass = "StageDirection";
+        if (annotation) {
+          playerline = '[' + playerline + ']';
+        } else {
+          playerline = '[' + playerline + ']';
+        }
+      }
+    } else {
+      // Fix: Use the lastPlayer variable to track current speaker
+      if (obj.player == lastPlayer) {
+        var player;
+        var playerClass = obj.player ? obj.player.replace(/\s+/g, '') : '';
+      } else {
+        var player = obj.player;
+        var playerClass = obj.player ? obj.player.replace(/\s+/g, '') : '';
+        // Update the lastPlayer with the current player
+        lastPlayer = obj.player;
+      }
+    }
+
+    // Line numbers - display every 5th line for spoken dialogue
+    var lineNumber = '';
+    if (!isStageDirection && dialogueLineCounter % 5 === 0) {
+      lineNumber = obj.act + '.' + obj.scene + '.' + dialogueLineCounter;
+    }
+
+    // Create line with data attributes for efficient version switching
+    var isCut = obj.cutting === "TRUE";
+    var isRevised = obj.revision ? true : false;
+    var className = "";
+    
+    if (viewMode === 'both') {
+      if (isCut) className = "cut-line";
+      else if (isAddedLine) className = "added-line";
+      else if (isRevised) className = "revised-line";
+    }
+
+    var line = '<section class="line ' + className + '" id="' + uniqueLineId + '"' + datalineAttr + 
+               ' data-is-cut="' + isCut + '" data-is-revised="' + isRevised + 
+               ' data-is-addition="' + isAddedLine + '"' +
+               (obj.revision ? ' data-original-text="' + encodeURIComponent(originalText) + '"' : '') + '>';
+    
+    // Add branching visualization if necessary
+    if (viewMode === 'both' && (isCut || isRevised)) {
+      line += '<div class="branch-indicator ' + (showBranching ? '' : 'hidden') + ' ' + 
+              (isAddedLine ? 'branch-addition' : '') + '"></div>';
+    }
+    
+    // add player if new player to announce
+    if (player) {
+      var safePlayerClass = playerClass ? playerClass.replace(/;/g, ' ') : '';
+      var safePlayer = obj.player ? obj.player.replace(/;/g, '<br>') : '';
+      line += '<div class="' + safePlayerClass + ' act' + obj.act + 'scene' + obj.scene + ' row mt-4 playline" style=""><div class="col-1 small"></div><div class="col-8 col-md-9 fw-bold"><p class="mb-0 playerline fw-bold">' + safePlayer + ': </p></div></div>';
+    }
+    
+    // start line - using the new unique ID
+    var safePlayerClass = playerClass ? playerClass.replace(/;/g, ' ') : '';
+    line += '<div class="' + safePlayerClass + ' act' + obj.act + 'scene' + obj.scene + ' row playline textline" style="">';
+    
+    // add act.scene.line number using automatic dialogue counter
+    var actSceneLineId = obj.act + '.' + obj.scene + '.' + (!isStageDirection ? dialogueLineCounter : '');
+    
+    // Store the automatic line number as a data attribute for reference
+    line += '<div class="col-1 col-print-1" data-scene-ref="' + actSceneLineId + '" data-dialogue-line="' + 
+            (!isStageDirection ? dialogueLineCounter : '') + '"><p class="small mt-2 text-end m-0" style="font-size:10px;">' + 
+            lineNumber + '</p></div>';
+    
+    // add playerline and annotation if it exists
+    if (annotation) {
+      line += '<div class="col-10 col-md-6 col-print-10 pr-0 playerline annobutton annotated" onclick="toggleAnnotation(&apos;' + annoId + '&apos;);" data-filter="' + annoId + '">' + playerline + '</div>';
+      line += '<div class="d-none d-md-block col-12 col-md-5 small anno-container"><div class="annotation annobutton" onclick="toggleAnnotation(&apos;' + annoId + '&apos;);" id="' + annoId + '" data-filter="' + annoId + '"><div class="content"><p>' + annotation + '</p></div></div></div>';
+    } else if (ibid) {
+      line += '<div class="col-10 col-md-6 col-print-10 pr-0 playerline annobutton annotated ' + annoId + '" onclick="toggleAnnotation(&apos;' + annoId + '&apos;);" data-filter="' + annoId + '">' + playerline + '</div>';
+    } else {
+      line += '<div class="col-10 col-md-6 playerline col-print-10">' + playerline + '</div>';
+      line += '<div class="d-none d-md-block col-12 col-md-5 small"></div>';
+    }
+
+    // Add original version for "both" view mode
+    if (viewMode === 'both' && isRevised) {
+      line += '</div><div class="original-line row playline textline">';
+      line += '<div class="col-1 col-print-1"></div>';
+      
+      if (isAddedLine) {
+        // For added lines, don't show anything
+        
+      } else {
+        // For regular revisions, show original text
+        line += '<div class="col-10 col-md-6 playerline col-print-10 original-text">' + originalText + '</div>';
+      }
+      
+      line += '<div class="d-none d-md-block col-12 col-md-5 small"></div>';
+    }
+
+    line += '</div></section>';
+    return line;
+  }
+
+  /* Change display mode with optimized switching */
+  function changeDisplayMode(mode) {
+    // If no cutting or revision data, changing modes has no effect
+    if (!hasCuttingData && !hasRevisionData && mode !== 'cut') {
+      // Maybe show a notification that no comparison data exists
+      return;
+    }
+
+    const oldMode = viewMode;
+    viewMode = mode;
+    
+    // Check if we need to rebuild the DOM (only when essential)
+    const needsRebuild = 
+      (oldMode === 'cut' && mode !== 'cut') || // We need to show previously hidden cut lines
+      (mode === 'cut' && oldMode !== 'cut') || // We need to hide cut lines
+      (mode === 'both' && oldMode !== 'both'); // We need to add original versions
+
+    if (needsRebuild) {
+      // Capture current filter state before rebuilding
+      let url = new URL(window.location);
+      let params = url.searchParams;
+      var activeSceneFilter = params.get('scene');
+      var activePlayerFilter = params.get('player');
+      var activeSearchFilter = params.get('q');
+      
+      // Get data from session storage as dd_items is now local
+      const dd_items = JSON.parse(sessionStorage.getItem("dd_items_store") || "[]");
+      filterItems(dd_items, "");
+      
+      // Reapply filters after DOM rebuild
+      const quicksearchInput = document.getElementById('quicksearch');
+      const goButton = document.getElementById('goButton');
+      const playersSelect = document.getElementById('players');
+      const scenesSelect = document.getElementById('scenes');
+      
+      if (activeSearchFilter && quicksearchInput && goButton) {
+        quicksearchInput.value = activeSearchFilter;
+        goButton.click();
+      } else if (activePlayerFilter && playersSelect) {
+        playersSelect.value = activePlayerFilter;
+        const changeEvent = new Event('change', { bubbles: true });
+        playersSelect.dispatchEvent(changeEvent);
+      } else if (activeSceneFilter && scenesSelect) {
+        scenesSelect.value = activeSceneFilter;
+        const changeEvent = new Event('change', { bubbles: true });
+        scenesSelect.dispatchEvent(changeEvent);
+      }
+    } else {
+      // More efficient switching using existing DOM
+      // For example when switching between 'original' and revised versions
+      document.querySelectorAll('[data-is-revised="true"]').forEach(function(section) {
+        const playerlineEl = section.querySelector('.playerline:not(.original-text)');
+        if (playerlineEl) {
+          // Check if it's an added line
+          const isAddition = section.getAttribute('data-is-addition') === 'true';
+          
+          if (mode === 'original') {
+            // For added lines in original mode, we hide them completely
+            if (isAddition) {
+              section.style.display = 'none';
+            } else {
+              // For regular revisions, switch to original text from data attribute
+              const originalText = decodeURIComponent(section.getAttribute('data-original-text') || '');
+              if (originalText) {
+                playerlineEl.innerHTML = originalText;
+              }
+            }
+          } else {
+            // In revised or both mode, make sure added lines are visible
+            if (isAddition) {
+              section.style.display = '';
+            }
+            
+            // Get revised text from dd_items
+            const dataline = section.getAttribute('data-dataline');
+            const items = JSON.parse(sessionStorage.getItem("dd_items_store") || "[]");
+            const item = items.find(i => i.dataline == dataline);
+            if (item && item.revision) {
+              playerlineEl.innerHTML = item.revision;
+            }
+          }
+        }
+      });
+    }
+    
+    // Add CSS classes for styling the different views
+    const container = document.getElementById('contents-container');
+    container.classList.remove('view-cut', 'view-original', 'view-both');
+    container.classList.add('view-' + mode);
+  }
+
+  /* function to filter items to be displayed on browse */
+  function filterItems(arr, q) {
+    // Reset the flags for checking cutting/revision data
+    hasCuttingData = false;
+    hasRevisionData = false;
+    
+    // Reset the dialogue line counter when filtering
+    dialogueLineCounter = 0;
+    
+    // dont filter if no q 
+    var filteredItems = arr;
+
+    // Check if any item has cutting or revision data
+    for (var i = 0, len = filteredItems.length; i < len; i++) {
+      if (filteredItems[i].cutting === "TRUE") hasCuttingData = true;
+      if (filteredItems[i].revision && filteredItems[i].revision.trim() !== "") hasRevisionData = true;
+      
+      // Early exit if we found both types
+      if (hasCuttingData && hasRevisionData) break;
+    }
+
+    // add number 
+    document.getElementById("numberof").innerHTML = filteredItems.length + " of " + arr.length + " items";
+    
+    // add stuff, make lines first in giant var, then add all at once to speed things up
+    var lines = "";
+    for (var i = 0, len = filteredItems.length; i < len; i++) {
+      lines += makeLine(filteredItems[i]);
+    }
+    document.getElementById("contents-container").innerHTML = lines;
+    
+    // After all lines are rendered, check if comparison controls should be shown
+    toggleComparisonUIVisibility();
+  }
+
+  // Function to show/hide comparison controls based on data availability
+  function toggleComparisonUIVisibility() {
+    const versionCompare = document.getElementById('versionCompare');
+    if (!versionCompare) return;
+    
+    // Only show the comparison UI if we have cutting data or revision data
+    if (hasCuttingData || hasRevisionData) {
+      versionCompare.classList.remove('d-none');
+    } else {
+      versionCompare.classList.add('d-none');
+    }
+  }
+
+  function selectScenes(arr, acts_arr) {
+    var options = '<option value="#" class="reset" selected="selected reset">Filter by Scene</option>';
+    var scenesNav = '';
+    var scenesSide = '';
+    if (arr.length < 18) {
+      for (var i = 0, len = arr.length; i < len; i++) {
+        var act = arr[i].split('.')[0];
+        var scene = arr[i].split('.')[1];
+        var sceneClass = 'act' + act + 'scene' + scene;
+        options += '<option value="' + sceneClass + '">Act ' + act + ', Scene ' + scene + '</option>';
+
+        scenesSide += '<a class="py-0 border-bottom fst-italic small text-dark scene-scroll" role="button" onclick="scrollToScene(\'act' + act + 'scene' + scene + '\')" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-original-title="Jump to Scene ' + arr[i] + '">' + arr[i] + '</span></a><br>';
+      }
+    } else {
+      for (var i = 0, len = arr.length; i < len; i++) {
+        var act = arr[i].split('.')[0];
+        var scene = arr[i].split('.')[1];
+        var sceneClass = 'act' + act + 'scene' + scene;
+        options += '<option value="' + sceneClass + '">Act ' + act + ', Scene ' + scene + '</option>';
+      }
+      for (var i = 0, len = acts_arr.length; i < len; i++) {
+        scenesSide += '<a class="py-0 border-bottom fst-italic small text-dark scene-scroll" role="button" onclick="scrollToScene(\'act' + acts_arr[i] + '-start\')" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-original-title="Jump to Act ' + acts_arr[i] + '">Act ' + acts_arr[i] + '</span></a><br>';
+      }
+    }
+    document.getElementById("scenes").innerHTML = options;
+    document.getElementById("scenesScroll").innerHTML = scenesSide;
+  }
+
+function selectPlayers(arr) {
+    var options = '<option value="#" class="reset" selected="selected reset">Filter by Player</option>';
+    arr.sort();
+    for (var i = 0, len = arr.length; i < len; i++) {
+      var playerClass = arr[i].replaceAll(' ', '');
+      options += '<option value="' + playerClass + '">' + arr[i] + '</option>';
+    }
+    document.getElementById("players").innerHTML = options;
+  }
+
+  /* Initialize tooltips for bootstrap */
+  function initTooltips() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+      new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+  }
+
+  function scrollToScene(scene) {
+    const scene_starts = document.getElementsByClassName(scene);
+    window.scroll({
+      top: scene_starts[0].offsetTop,
+      behavior: 'smooth'
+    });
+  }
+
+  /**
+   * Scrolls to a line selected from search results and highlights it.
+   */
+  function scrollToLine() {
+    var lineId = document.getElementById('searchResults').value;
+    // If the lineId is not a valid ID or the first option (instructions), do nothing
+    if (!lineId || lineId === "Select and scroll to a matching line") return;
+    
+    // Find the element by its ID
+    var lineElement = document.getElementById(lineId);
+    if (lineElement) {
+      // Calculate position with offset for better visibility
+      var position = lineElement.offsetTop;
+      var offsetPosition = position - 200; // Provide enough space above the element
+      
+      // Scroll to the element with smooth behavior
+      window.scroll({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+      
+      // Highlight the element to make it more visible
+      lineElement.classList.add('anchored-highlight');
+    }
+  }
+
+  /**
+   * Toggles the visibility of branching visualization indicators.
+   */
+  function toggleBranchView() {
+    showBranching = !showBranching;
+    const branchIndicators = document.querySelectorAll('.branch-indicator');
+    branchIndicators.forEach(function(indicator) {
+      if (showBranching) {
+        indicator.classList.remove('hidden');
+      } else {
+        indicator.classList.add('hidden');
+      }
+    });
+  }
+
+  /* TRANSCRIPT FUNCTIONALITY */
+  // Filter by player selection
+  function setupPlayerFilter() {
+    document.getElementById('players').addEventListener('change', function() {
+      var myClass = this.value;
+      document.querySelectorAll('section').forEach(function(section) {
+        section.classList.remove('featured');
+      });
+      document.querySelectorAll('div').forEach(function(div) {
+        div.classList.remove('anchored-highlight');
+      });
+      document.querySelectorAll('.playline').forEach(function(line) {
+        line.style.display = 'none';
+      });
+      document.querySelectorAll('div.' + myClass).forEach(function(div) {
+        div.style.display = '';
+      });
+      const quicksearchInput = document.getElementById('quicksearch');
+      if (quicksearchInput) {
+        quicksearchInput.value = '';
+      }
+      var numberofint = document.querySelectorAll('div.' + myClass).length;
+      const numberOfEl = document.getElementById('numberof');
+      if (numberOfEl) {
+        numberOfEl.innerHTML = numberofint + ' lines';
+      }
+      document.querySelectorAll('.linecount').forEach(function(el) {
+        el.classList.remove('d-none');
+      });
+
+      const firstOptionValue = document.querySelector('select option') ? document.querySelector('select option').value : '';
+      document.querySelectorAll('select').forEach(function(select) {
+        if (select !== this) {
+          select.value = firstOptionValue;
+        }
+      }.bind(this));
+
+      let url = new URL(window.location);
+      let params = url.searchParams;
+      params.set('player', myClass);
+      params.delete('q');
+      params.delete('scene');
+      var p = params.toString();
+      window.history.replaceState({}, '', location.pathname + '?' + p);
+    });
+  }
+
+  // Filter by scene selection
+  function setupSceneFilter() {
+    document.getElementById('scenes').addEventListener('change', function() {
+      var myClass = this.value;
+      document.querySelectorAll('section').forEach(function(section) {
+        section.classList.remove('featured');
+      });
+      document.querySelectorAll('div').forEach(function(div) {
+        div.classList.remove('anchored-highlight');
+      });
+      document.querySelectorAll('.playline').forEach(function(line) {
+        line.style.display = 'none';
+      });
+      document.querySelectorAll('div.' + myClass).forEach(function(div) {
+        div.style.display = '';
+      });
+      const quicksearchInput = document.getElementById('quicksearch');
+      if (quicksearchInput) {
+        quicksearchInput.value = '';
+      }
+      var numberofint = document.querySelectorAll('div.' + myClass).length;
+      const numberOfEl = document.getElementById('numberof');
+      if (numberOfEl) {
+        numberOfEl.innerHTML = numberofint + ' lines';
+      }
+      document.querySelectorAll('.linecount').forEach(function(el) {
+        el.classList.remove('d-none');
+      });
+
+      const firstOptionValue = document.querySelector('select option') ? document.querySelector('select option').value : '';
+      document.querySelectorAll('select').forEach(function(select) {
+        if (select !== this) {
+          select.value = firstOptionValue;
+        }
+      }.bind(this));
+
+      let url = new URL(window.location);
+      let params = url.searchParams;
+      params.set('scene', myClass);
+      params.delete('q');
+      params.delete('player');
+      var p = params.toString();
+      window.history.replaceState({}, '', location.pathname + '?' + p);
+    });
+  }
+
+  // Setup filters toggle
+  function setupFiltersButton() {
+    const filtersButton = document.getElementById('filters');
+    if (filtersButton) {
+      filtersButton.addEventListener('click', function() {
+        // Simply toggle the side scene scroll visibility
+        const sideSceneScroll = document.getElementById('side-scene-scroll');
+        if (sideSceneScroll) {
+          sideSceneScroll.classList.toggle('d-none');
+        }
+      });
+    }
+  }
+
+  // Reset filters
+  function setupResetButton() {
+    document.querySelectorAll('button.reset').forEach(function(button) {
+      button.addEventListener('click', function() {
+        document.querySelectorAll('.playline').forEach(function(line) {
+          line.style.display = '';
+        });
+        document.querySelectorAll('div').forEach(function(div) {
+          div.classList.remove('anchored-highlight');
+          div.classList.remove('annotate-show');
+          div.classList.remove('featured');
+        });
+        document.querySelectorAll('section').forEach(function(section) {
+          section.classList.remove('featured');
+        });
+        document.querySelectorAll('span').forEach(function(span) {
+          span.classList.remove('text-danger');
+        });
+        const quicksearchInput = document.getElementById('quicksearch');
+        if (quicksearchInput) {
+          quicksearchInput.value = '';
+        }
+        const playersSelect = document.getElementById('players');
+        if (playersSelect && playersSelect.options.length > 0) {
+          playersSelect.value = playersSelect.options[0].value;
+        }
+        const scenesSelect = document.getElementById('scenes');
+        if (scenesSelect && scenesSelect.options.length > 0) {
+          scenesSelect.value = scenesSelect.options[0].value;
+        }
+        var numberofint = document.querySelectorAll('section').length;
+        const numberOfEl = document.getElementById('numberof');
+        if (numberOfEl) {
+          numberOfEl.innerHTML = numberofint + ' lines';
+        }
+        let url = new URL(window.location);
+        let params = url.searchParams;
+        params.delete('q');
+        params.delete('player');
+        params.delete('scene');
+        var p = params.toString();
+        window.history.replaceState({}, '', location.pathname + '?' + p);
+        document.querySelectorAll('.filter-search').forEach(function(el) {
+          el.classList.add('d-none');
+        });
+        const searchResultsEl = document.getElementById('searchResults');
+        if (searchResultsEl) {
+          searchResultsEl.innerHTML = '';
+        }
+      });
+    });
+  }
+
+  // Filter lines by search
+  function filterLines() {
+    // First, reset everything to clean state
+    // Remove all highlight spans from previous searches
+    document.querySelectorAll('.playerline').forEach(function(el) {
+      el.classList.remove('anchored-highlight');
+      el.classList.remove('featured');
+      // Remove any existing highlight spans
+      el.querySelectorAll('span.text-danger').forEach(function(span) {
+        var parent = span.parentNode;
+        parent.replaceChild(document.createTextNode(span.textContent), span);
+        parent.normalize(); // Merge adjacent text nodes
+      });
+    });
+
+    // Make sure all lines are visible (reset any player/scene filters)
+    document.querySelectorAll('.playline').forEach(function(line) {
+      line.style.display = '';
+    });
+
+    // Reset the filter dropdowns
+    const playersSelect = document.getElementById('players');
+    if (playersSelect && playersSelect.options.length > 0) {
+      playersSelect.value = playersSelect.options[0].value;
+    }
+    const scenesSelect = document.getElementById('scenes');
+    if (scenesSelect && scenesSelect.options.length > 0) {
+      scenesSelect.value = scenesSelect.options[0].value;
+    }
+
+    var input = document.getElementById("quicksearch");
+    if (!input) return;
+
+    let url = new URL(window.location);
+    let params = url.searchParams;
+    params.set('q', input.value);
+    // Remove other filter params since we're resetting them
+    params.delete('player');
+    params.delete('scene');
+    var p = params.toString();
+    window.history.replaceState({}, '', location.pathname + '?' + p);
+
+    var filterplain = input.value;
+    var filter = input.value.toUpperCase();
+    var itemcontainer = document.getElementById("contents-container");
+    if (!itemcontainer) return;
+
+    var items = itemcontainer.getElementsByTagName("section");
+    var searchResultsHTML = '<option value="">Select and scroll to a matching line</option>';
+    var featuredCount = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var itemcontents = items[i].getElementsByClassName("playerline")[0];
+      if (itemcontents) {
+        var lineId = items[i].id; // Get ID directly from the section element
+        
+        if (itemcontents.textContent.toUpperCase().indexOf(filter) > -1 && lineId) {
+          itemcontents.classList.add("featured");
+          featuredCount++;
+          itemcontents.innerHTML = itemcontents.innerHTML.replace(
+            new RegExp(filterplain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), 
+            "<span class='text-danger'>$&</span>"
+          );
+          searchResultsHTML += '<option value="' + lineId + '">' + itemcontents.textContent.substring(0, 100) + '...</option>';
+        }
+      }
+    }
+    const numberOfLinesEl = document.getElementById('numberoflines');
+    if (numberOfLinesEl) {
+      numberOfLinesEl.innerHTML = featuredCount + " lines match your query";
+    }
+    const searchResultsSelect = document.getElementById('searchResults');
+    if (searchResultsSelect) {
+      searchResultsSelect.innerHTML = searchResultsHTML;
+    }
+    document.querySelectorAll('.linecount').forEach(function(el) {
+      el.classList.remove('d-none');
+    });
+    document.querySelectorAll('.filter-search').forEach(function(el) {
+      el.classList.remove('d-none');
+    });
+  }
+
+  // Setup quick search keypress
+  function setupQuickSearch() {
+    const quicksearchKeypress = document.getElementById('quicksearch');
+    if (quicksearchKeypress) {
+      quicksearchKeypress.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' || e.which === 13) {
+          const goButton = document.getElementById('goButton');
+          if (goButton) {
+            goButton.click();
+          }
+        }
+      });
+    }
+
+    // Setup the Go button
+    const goButton = document.getElementById('goButton');
+    if (goButton) {
+      goButton.addEventListener('click', filterLines);
+    }
+  }
+
+  /* ANNOTATION FUNCTIONALITY */
+  // Toggle annotation visibility
+  function toggleAnnotation(annotation) {
+    // Hide all other annotations
+    document.querySelectorAll('div.annotation').forEach(function(div) {
+      if (div.id !== annotation) {
+        div.classList.remove('annotate-show');
+      }
+      if (div.id !== annotation && div.parentNode) {
+        div.parentNode.classList.remove('show-mobile-annotation');
+      }
+    });
+
+    // Toggle the targeted annotation
+    var targetElement = document.getElementById(annotation);
+    if (targetElement) {
+      targetElement.classList.toggle('annotate-show');
+      targetElement.style.width = '90%';
+      if (targetElement.parentNode) {
+        targetElement.parentNode.classList.toggle('show-mobile-annotation');
+      }
+    }
+
+    // Manage highlight styling
+    document.querySelectorAll('span.hilite').forEach(function(span) {
+      if (!span.classList.contains('hi-' + annotation)) {
+        span.classList.remove('fw-bold');
+      }
+    });
+
+    document.querySelectorAll('.hi-' + annotation).forEach(function(el) {
+      el.classList.toggle('fw-bold');
+    });
+  }
+
+  // Setup highlight hover effects
+  function setupHighlights() {
+    document.querySelectorAll('.hilite').forEach(function(element) {
+      element.addEventListener('mouseenter', function() {
+        var hiliteid = this.dataset.filter;
+        document.querySelectorAll('.' + hiliteid).forEach(function(el) {
+          el.classList.toggle('fw-bold');
+        });
+      });
+      element.addEventListener('mouseleave', function() {
+        var hiliteid = this.dataset.filter;
+        document.querySelectorAll('.' + hiliteid).forEach(function(el) {
+          el.classList.toggle('fw-bold');
+        });
+      });
+    });
+  }
+
+  /* Setup version toggle controls */
+  function setupVersionControls() {
+    document.querySelectorAll('input[name="versionMode"]').forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        changeDisplayMode(this.value);
+      });
+    });
+    
+  }
+
+  /* INITIALIZATION */
+  function pageInit() {
+    // Show loading overlay initially
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+      loadingOverlay.style.display = 'flex';
+    }
+    
+    // Pull data from session storage
+    let items = JSON.parse(sessionStorage.getItem("dd_items_store") || "[]");
+    
+    // If no items but we have a URL parameter, the data might still be loading
+    const urlParams = new URLSearchParams(window.location.search);
+    if (items.length === 0) {
+      if (urlParams.has("play")) {
+        console.log("Data not yet available, will retry in 300ms");
+        setTimeout(pageInit, 300); // Try again in 300ms
+        return;
+      } else {
+        // No items and no play parameter - hide loading overlay
+        if (loadingOverlay) {
+          loadingOverlay.style.opacity = '0';
+          setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+          }, 100);
+        }
+        // If there's no data at all, we shouldn't try to process anything further
+        console.log("No data available and no play parameter");
+        return;
+      }
+    }
+    
+    // Make this local dd_items array available globally for backward compatibility
+    window.dd_items = items;
+    
+    // Quick pre-scan to check if cutting or revision data exists at all
+    hasCuttingData = items.some(item => item.cutting === "TRUE");
+    hasRevisionData = items.some(item => item.revision);
+    
+    // Process items to extract actscene field
+    items.forEach(function(item) {
+      if (item.act && item.scene) {
+        item.actscene = item.act + '.' + item.scene;
+        item.actsceneline = item.act + '.' + item.scene + '.' + item.line;
+      }
+    });
+    
+    // Process URL parameters on load
+    let url = new URL(window.location);
+    let params = url.searchParams;
+    var dataFilter = params.get('q');
+    var sceneFilter = params.get('scene');
+    var playerFilter = params.get('player');
+    var hashfilter = decodeURIComponent(location.hash.substring(1));
+
+    const quicksearchInput = document.getElementById('quicksearch');
+    const goButton = document.getElementById('goButton');
+    const filtersButton = document.getElementById('filters');
+    const playersSelect = document.getElementById('players');
+    const scenesSelect = document.getElementById('scenes');
+    const sideSceneScroll = document.getElementById('side-scene-scroll');
+
+    // Extract metadata from the play
+    const dd_actscenes = [...new Set(items.filter(item => item.act && item.scene).map(function(d) { return d.actscene; }))];
+    const dd_acts = [...new Set(items.filter(item => item.act).map(function(d) { return d.act; }))];
+    const dd_players = [...new Set(items.filter(item => item.player).map(function(d) { return d.player; }))];
+    
+    // Setup UI elements
+    selectScenes(dd_actscenes, dd_acts);
+    selectPlayers(dd_players);
+    filterItems(items, "");
+    setupPlayerFilter();
+    setupSceneFilter();
+    setupFiltersButton();
+    setupResetButton();
+    setupQuickSearch();
+    setupHighlights();
+    setupVersionControls();
+    initTooltips();
+
+    // Handle URL parameters for initial state
+    if (dataFilter && quicksearchInput && goButton) {
+      quicksearchInput.value = dataFilter;
+      goButton.click();
+      params.delete('scene');
+      params.delete('player');
+      if (filtersButton) filtersButton.click();
+    } else if (playerFilter && playersSelect) {
+      params.delete('q');
+      playersSelect.value = playerFilter;
+      const changeEvent = new Event('change', { bubbles: true });
+      playersSelect.dispatchEvent(changeEvent);
+      if (filtersButton) filtersButton.click();
+    } else if (sceneFilter && scenesSelect) {
+      params.delete('q');
+      scenesSelect.value = sceneFilter;
+      const changeEvent = new Event('change', { bubbles: true });
+      scenesSelect.dispatchEvent(changeEvent);
+      if (filtersButton) filtersButton.click();
+      if (sideSceneScroll) sideSceneScroll.classList.add('d-none');
+    } else if (hashfilter) {
+      params.delete('q');
+      params.delete('scene');
+      params.delete('player');
+      const hashedElement = document.getElementById(hashfilter);
+      if (hashedElement) {
+        hashedElement.classList.add('anchored-highlight');
+      }
+    }
+
+    // Update URL if params were modified
+    var p = params.toString();
+    if (p !== url.searchParams.toString()) {
+      window.history.replaceState({}, '', location.pathname + (p ? '?' + p : ''));
+    }
+    
+    // Hide the loading overlay after all initialization is complete
+    // Use setTimeout to ensure the content is rendered before hiding the loader
+    setTimeout(() => {
+      if (loadingOverlay) {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+          loadingOverlay.style.display = 'none';
+        }, 100);
+      }
+    }, 100);
+  }
+
+  // Make functions globally accessible
+  window.toggleAnnotation = toggleAnnotation;
+  window.scrollToScene = scrollToScene;
+  window.scrollToLine = scrollToLine;
+  window.filterLines = filterLines;
+  window.pageInit = pageInit;
+  window.toggleBranchView = toggleBranchView;
+  
+  // Wait for DOM content to load, then initialize
+  document.addEventListener('DOMContentLoaded', function() {
+    // Make sure the contents container exists before initializing
+    if (document.getElementById('contents-container')) {
+      pageInit();
+    }
+  });
+
+})();
+</script>

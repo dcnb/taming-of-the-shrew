@@ -1,0 +1,103 @@
+---
+layout: default
+custom-foot: dramaturgy/lib/markdownit-js.html;dramaturgy/js/playscript-js.html
+---
+
+{% assign lines = site.data[site.play] %}
+
+{%- comment -%} find all words used in the player field of our metadata {%- endcomment -%}
+{% capture players_play %}{% for line in lines %}{% unless line.player == "ACT" or line.player == "SCENE" %}{{- line.player -}};{% endunless %}{% endfor %}{% endcapture%}
+{%- assign players = players_play | split: ";" -%}
+{%- assign uniquePlayers = players | uniq -%}
+
+{%- comment -%} find all acts and sences {%- endcomment -%}
+{%- assign uniqueScenes = lines | map: 'actscene' | compact | uniq -%}
+
+<div class="container">
+    <button class="btn btn-outline-dark float-end mt-n2 p-3 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilters" aria-expanded="false" aria-controls="collapseFilters" id="filters">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sliders"
+            viewBox="0 0 16 16">
+            <path fill-rule="evenodd"
+                d="M11.5 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M9.05 3a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0V3zM4.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M2.05 8a2.5 2.5 0 0 1 4.9 0H16v1H6.95a2.5 2.5 0 0 1-4.9 0H0V8zm9.45 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m-2.45 1a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0v-1z" />
+        </svg>
+         <span class="d-none d-md-inline ms-2 fs-6">Filters</span>
+    </button>
+
+    <div class="row my-3 bg-white border-bottom border-left border-right d-print-none collapse w-75" id="collapseFilters">
+
+        <div class="col-md-3">
+            <p class="pt-4">
+                <label for="scenes" class="visually-hidden">Filter by Scene</label>
+                <select id="scenes" class="filteroptions filters px-3 py-2" style="max-width: 100%;">
+                    <option value="#" class="reset" selected="selected reset">Filter by Scene</option>
+
+                </select>
+            </p>
+        </div>
+        <div class="col-md-3">
+            <p class="pt-4">
+                <label for="players" class="visually-hidden">Filter by Player</label>
+                <select id="players" class="filteroptions filters px-3 py-2" style="max-width: 100%;">
+                    <option value="#" class="reset" selected="selected reset">Filter by Player</option>
+
+                </select>
+            </p>
+        </div>
+        <div class="col-md-6">
+            <div id="scriptsearch" class="bg-lightr">
+                <div class="row pt-4">
+                    <div class="col-md-6">
+                        <div class="input-group fs-5">
+                            <label for="quicksearch" class="visually-hidden">Search script</label>
+                            <input type="text" class="form-control" placeholder="Search..." aria-describedby="goButton" id="quicksearch">
+                            <div class="input-group-append">
+                                <button class="btn btn-primary rounded-right border-light input-group-text" type="submit" title="Search" alt="Search" id="goButton" onclick="filterLines()">Go</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <button class="reset btn btn-sm btn-outline-primary mt-1" href="#" data-filter="">Reset Filters</button>
+                        <p class="d-none linecount mt-2 small ms-3 h5"><span id="numberof"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 d-none" id="versionCompare">
+            <div class="mt-2 small">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="me-3">Play Version:</span>
+                    <div class="btn-group" role="group" aria-label="Play version options">
+                        <input type="radio" class="btn-check" name="versionMode" id="versionCut" value="cut" checked>
+                        <label class="btn btn-sm btn-outline-primary" for="versionCut">Cut/Revised (Default)</label>
+                        
+                        <input type="radio" class="btn-check" name="versionMode" id="versionOriginal" value="original">
+                        <label class="btn btn-sm btn-outline-primary" for="versionOriginal">Original</label>
+                        
+                        <input type="radio" class="btn-check" name="versionMode" id="versionBoth" value="both">
+                        <label class="btn btn-sm btn-outline-primary" for="versionBoth">Compare Both</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 d-none filter-search mt-2 small">
+            <p class="linecount small ms-3 h5"><span id="numberoflines"></span></p>
+            <label for="searchResults" class="visually-hidden">Search results - select to jump to line</label>
+            <select class="mb-2 form-select" id="searchResults" onchange="scrollToLine();">
+    
+            </select>
+        </div>
+    </div>
+    
+{% include dramaturgy/style/loading.html %}
+
+{% include dramaturgy/side-scene-scroll.html %}
+<div id="contents-container">
+
+</div>
+<div class="my-4">
+    <hr />
+    <hr />
+
+</div>
+</div>
+

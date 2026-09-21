@@ -1,0 +1,40 @@
+---
+# generate time-focused json data suitable for TimelineJS.
+# includes all items in metadata that have a "date" field filled.
+# current using relative_url due to jekyll bug, should be absolute_url in production!
+# to just feature parent objects of compound objects, you will want to change the where_exp below to "where_exp: 'item','item.parentid == nil'"
+---
+{%- assign items = site.data.production-timeline | where_exp: 'item', 'item.date' -%}
+{
+    "title": {
+        "media": {
+          "url": "{{ site.data.theme.timeline-featured-img | relative_url }}",
+          "caption": {{ site.data.theme.timeline-featured-img-caption | jsonify }},
+          "credit": "{% if site.data.theme.timeline-title %}{{ site.data.theme.timeline-title }}{% else %}{{ site.title }} Production Timeline{% endif %}"
+        },
+        "text": {
+          "headline": {{ site.title | append: ' Timeline' | jsonify }},
+          "text": {{ site.description | jsonify }}
+        }
+    },
+    "events": [
+      {% for item in items %}{%- if item.objectid -%}{%- assign collection-item = site.data[site.metadata] | where: 'objectid', item.objectid | first -%}{%- endif -%}{
+        "media": {
+          "url": "{% if item.media %}{{ item.media | relative_url }}{% elsif collection-item %}{{ collection-item.image_small | default: collection-item.image_thumb | default: collection-item.object_location | relative_url }}{% endif %}",
+          "caption": {{ item.title | jsonify }},
+          "link": "{% if item.link %}{{ item.link }}{% elsif collection-item %}{{ '/items/' | relative_url }}{% if collection-item.parentid %}{{ collection-item.parentid }}.html#{{ collection-item.objectid }}{% else %}{{ collection-item.objectid }}.html{% endif %}{% endif %}"
+        },
+        "start_date": { 
+          {% if item.date contains '-' %}{% assign dates = item.date | strip | split: '-' %}
+          "month": "{{ dates[1] }}",
+          "day": "{{ dates[2] }}",
+          "year": "{{ dates[0] }}"{% elsif item.date contains '/' %}"year": "{{ item.date | strip | split: '/' | last }}"{% else %}
+          "year": "{{ item.date }}"{% endif %}
+        },
+        "text": {
+          "headline": {{ item.title | jsonify }}{% if item.description %},
+          "text": {{ item.description | jsonify }}{% endif %}
+        }
+      }{% unless forloop.last %},{% endunless %}{% endfor %}
+    ]
+}

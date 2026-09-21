@@ -1,0 +1,581 @@
+/* 
+    Digital Dramaturgy / Annotation SCSS 
+    These styles load just before the custom.scss file, so you can override them if you need to.        
+*/
+.annotation {
+    background-color: transparent;
+    width: 15vw;
+    font-size: .8rem !important;
+    vertical-align: baseline;
+    position: relative;
+    z-index: 0;
+    font-size: smaller;
+    cursor: pointer;
+    max-height: 30px;
+
+    div.content {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin: 0px;
+        padding: .75em;
+
+        p {
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
+
+        figure,img {
+            display: none;
+        }
+    }
+}
+
+.annotate-show {
+    z-index: 100;
+    font-size: 1rem !important;
+
+    div.content {
+        overflow: visible;
+        white-space: normal !important;
+        background-color: #fff !important;
+        box-shadow: 1px 1px 4px #666;
+        padding: .75em;
+        z-index: 100;
+
+        figure,img {
+            display: block;
+        }
+    }
+}
+
+.annotated {
+    border-right: 1px solid #FFA500;
+    background-color: rgb(248, 247, 247);
+    cursor: pointer;
+
+    &:hover {
+        background-color: rgb(247, 244, 244);
+    }
+
+    .hilite {
+        border-bottom: 2px solid #FFA500;
+        cursor: pointer;
+
+        &:hover {
+            font-weight: bold;
+        }
+    }
+}
+
+.filter-search {
+    position: relative;
+    z-index: 100; 
+}
+
+.performance-annotated {
+    border-right: 1px solid #2535c9;
+    background-color: rgb(219, 241, 253);
+}
+
+
+.blockquote {
+    font-size: 1.75rem;
+}
+
+.featured {
+    background-color: #dbf1fd !important;
+
+    .annotated {
+        background-color: rgb(219, 241, 253) !important;
+
+    }
+}
+
+.anchored-highlight {
+    background: #dbf1fd;
+}
+
+
+
+.annotation {
+    img {
+        max-width: 100%;
+    }
+}
+
+.StageDirection {
+    font-style: italic;
+    margin-top: 15px;
+    .annotation{
+        font-style: normal;
+    }
+}
+
+.actstart {
+    font-weight: bold;
+    font-size: 30px;
+    margin-top: 35px;
+}
+
+.scenestart {
+    font-weight: bold;
+    font-size: 23px;
+    margin-top: 25px;
+}
+
+.scene-scroll{
+    font-size: .675em;
+    line-height: .675em;
+}
+
+/* Version view modes */
+      .view-both .cut-line, .view-both .revised-line, .view-both .added-line {
+        position: relative;
+        padding-left: 20px;
+        margin-bottom: 5px;
+      }
+      
+      .view-both .original-line {
+        padding-left: 30px;
+        margin-bottom: 5px;
+        color: #777;
+        font-style: italic;
+      }
+      
+      /* Branching line visualization */
+      .branch-indicator {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: #3498db;
+      }
+      
+      .branch-indicator.branch-addition {
+        background-color: #2ecc71; /* Green color for additions */
+      }
+      
+      .branch-indicator:before {
+        content: '';
+        position: absolute;
+        width: 8px;
+        height: 2px;
+        background-color: #3498db;
+        top: 50%;
+        left: 0;
+      }
+      
+      .branch-indicator.branch-addition:before {
+        background-color: #2ecc71; /* Green color for additions */
+      }
+      
+      .branch-indicator.hidden {
+        display: none;
+      }
+      
+      
+      /* Cut and revised line styling */
+      .cut-line {
+        background-color: rgba(255, 0, 0, 0.25);
+      }
+      
+      .revised-line {
+        background-color: rgba(255, 255, 0, 0.25);
+      }
+      
+      .added-line {
+        background-color: rgba(46, 204, 113, 0.25); /* Light green background for added lines */
+      }
+      
+      /* Addition marker styling */
+      .addition-marker {
+        color: #2ecc71;
+        font-style: italic;
+      }
+      
+      /* Only display cut content in comparison view */
+      .view-cut [data-is-cut="true"] {
+        display: none;
+      }
+
+// Print the columns at full width
+@media print {  
+    .col-print-1 {width:8%; }
+.col-print-2 {width:16%;}
+.col-print-3 {width:25%;}
+.col-print-4 {width:33%;}
+.col-print-5 {width:42%;}
+.col-print-6 {width:50%;}
+.col-print-7 {width:58%;}
+.col-print-8 {width:66%;}
+.col-print-9 {width:75%;}
+.col-print-10{width:83%;}
+.col-print-11{width:92%;}
+.col-print-12{width:100%;}
+body {
+    font-size:1em;
+}
+#filters{display:none !important;}
+ }
+
+ .show-mobile-annotation{
+     display: block !important;
+
+ }
+ @media screen and (max-width: 576px) {
+    .show-mobile-annotation{
+        display: block !important;
+   
+    }
+ }
+
+ .btn-outline-dark {
+    background-color: white;
+    &:hover{
+        background-color: #212529 !important;
+    }
+}
+
+
+/* Essay Header Styles - Inspired by minimal design principles */
+/* Hover effect for navigation items */
+.offcanvas-body .nav-link:hover,
+.offcanvas-body .nav-link:active,
+.offcanvas-body .btn-toggle:hover,
+.offcanvas-body .dropdown-item a:hover {
+    background-color: #212529 !important;
+    color: white !important;
+}
+
+
+/* Crop marks for design aesthetic */
+.essay-crop-marks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.crop-mark {
+  position: absolute;
+  background-color: #111111;
+}
+
+/* For full headers with dark backgrounds, make crop marks white */
+.essay-header-full .crop-mark {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Top left crop marks */
+.crop-top-left-h {
+  top: 15px;
+  left: 15px;
+  width: 12px;
+  height: 1px;
+}
+
+.crop-top-left-v {
+  top: 15px;
+  left: 15px;
+  width: 1px;
+  height: 12px;
+}
+
+/* Top right crop marks */
+.crop-top-right-h {
+  top: 15px;
+  right: 15px;
+  width: 12px;
+  height: 1px;
+}
+
+.crop-top-right-v {
+  top: 15px;
+  right: 15px;
+  width: 1px;
+  height: 12px;
+}
+
+/* Bottom left crop marks */
+.crop-bottom-left-h {
+  bottom: 15px;
+  left: 15px;
+  width: 12px;
+  height: 1px;
+}
+
+.crop-bottom-left-v {
+  bottom: 15px;
+  left: 15px;
+  width: 1px;
+  height: 12px;
+}
+
+/* Bottom right crop marks */
+.crop-bottom-right-h {
+  bottom: 15px;
+  right: 15px;
+  width: 12px;
+  height: 1px;
+}
+
+.crop-bottom-right-v {
+  bottom: 15px;
+  right: 15px;
+  width: 1px;
+  height: 12px;
+}
+
+/* Publication label styling */
+.essay-publication-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #111111;
+  font-weight: 400;
+}
+
+.essay-header-full .essay-publication-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Divider line styling */
+.essay-divider-line {
+  width: 40px;
+  height: 2px;
+  background-color: #111111;
+  margin: 1.5rem 0;
+}
+
+.essay-header-full .essay-divider-line {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Full-width header styles */
+.essay-header-full {
+  position: relative;
+  height: 100vh;
+  min-height: 500px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.essay-header-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.essay-header-content {
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.essay-header-caption {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  max-width: 800px;
+}
+
+.essay-header-title {
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.essay-header-subtitle {
+  font-weight: 300;
+  line-height: 1.3;
+}
+
+/* Half-width header styles */
+.essay-header-half {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 1px solid rgba(17, 17, 17, 0.1);
+}
+
+.essay-header-half .essay-publication-label {
+  color: #111111;
+}
+
+.essay-header-half .essay-divider-line {
+  background-color: #111111;
+}
+
+.min-vh-50 {
+  min-height: 50vh;
+}
+
+.essay-header-image {
+  position: relative;
+}
+
+.essay-header-image img {
+  transition: transform 0.3s ease;
+}
+
+.essay-header-image:hover img {
+  transform: scale(1.02);
+}
+
+/* Overlay title for mobile */
+.essay-header-overlay-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 2;
+  width: 90%;
+}
+
+.essay-header-overlay-title::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  z-index: -1;
+}
+
+.essay-header-overlay-title h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Text-only header styles */
+.essay-header-none {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  padding: 4rem 0;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+}
+
+.essay-header-none .essay-publication-label {
+  color: #111111;
+  margin-bottom: 1rem;
+}
+
+.essay-header-none .essay-divider-line {
+  background-color: #111111;
+}
+
+/* Essay content styles */
+.essay-content {
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.essay-content h2 {
+  margin-top: 3rem;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
+
+.essay-content h3 {
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.essay-content p {
+  margin-bottom: 1.5rem;
+}
+
+.essay-content blockquote {
+  border-left: 4px solid var(--bs-primary);
+  padding-left: 1.5rem;
+  margin: 2rem 0;
+  font-style: italic;
+  color: var(--bs-secondary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .essay-header-full {
+    height: 70vh;
+    min-height: 400px;
+  }
+  
+  .essay-header-title {
+    font-size: 2.5rem !important;
+  }
+  
+  .essay-header-subtitle {
+    font-size: 1.1rem !important;
+  }
+  
+  .essay-content {
+    font-size: 1rem;
+  }
+  
+  /* Half header mobile adjustments */
+  .essay-header-half .min-vh-50 {
+    min-height: auto;
+  }
+  
+  .essay-header-overlay-title h1 {
+    font-size: 1.75rem;
+  }
+  
+  .essay-header-subtitle-mobile {
+    text-align: center;
+  }
+}
+
+@media (max-width: 576px) {
+  .essay-header-full {
+    height: 60vh;
+    min-height: 350px;
+  }
+  
+  .essay-header-title {
+    font-size: 2rem !important;
+  }
+  
+  .essay-header-subtitle {
+    font-size: 1rem !important;
+  }
+  
+  .essay-header-overlay-title h1 {
+    font-size: 1.5rem;
+  }
+}
+
+/* Print styles */
+@media print {
+  .essay-header-full,
+  .essay-header-half,
+  .essay-header-none {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  .essay-header-full {
+    height: auto;
+    background: none !important;
+    color: black !important;
+  }
+  
+  .essay-header-overlay {
+    display: none;
+  }
+}

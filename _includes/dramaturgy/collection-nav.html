@@ -1,0 +1,49 @@
+<button class="btn btn-light" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasExample" aria-controls="offcanvasExample" style="position:fixed;top:0;left:0; margin:10;">
+  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" class="bi bi-list" viewBox="0 0 16 16">
+    <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5"/>
+  </svg>
+  </button>
+  
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="offcanvasLabel">A Play</h5>
+       
+      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close" id="side-nav-close"></button>
+    </div>
+    <div class="offcanvas-body px-0">
+            <p id="offcanvas-description" class="pb-0 px-3 fst-italic">{{site.description | default "..."}}</p>
+
+        <nav class="navbar">
+        <ul class="navbar-nav mr-auto w-100">
+            {%- assign navItems = site.data.config-nav | where_exp: 'item', 'item.dropdown_parent == nil' -%} 
+            {% for nav in navItems %}
+            {% if nav.stub %}
+            <li class="nav-item w-100 border">
+                <a class="nav-link px-3 w-100  text-dark {% if page.url == nav.stub %} bg-light{% endif %}" href="{{ nav.stub | relative_url }}">{{ nav.display_name }}</a>
+            </li>
+            {%- else -%}
+            <li class="nav-item w-100">
+                {% assign navChildren = site.data.config-nav | where_exp: 'item', 'item.dropdown_parent == nav.display_name' %}
+                {%- assign childStubs = navChildren | map: 'stub' -%}
+                {%- assign parent = navChildren[0].dropdown_parent | slugify -%}
+                <button class="btn btn-toggle nav-link dropdown-toggle collapsed w-100 bg-white text-dark border text-start{% if childStubs contains page.url %} annotated{% endif %}" data-bs-toggle="collapse" data-bs-target="#{{parent}}-collapse" aria-expanded="true">{{ nav.display_name }}</button>
+                <div class="collapse" id="{{parent}}-collapse">
+                  <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                    {% for c in navChildren %}
+                    <li class="dropdown-item"><a class="d-block w-100 bg-white text-dark border ps-4 py-2 text-decoration-none{% if page.url == c.stub %} bg-dark text-white{% endif %}" href="{{ c.stub | relative_url }}">{{ c.display_name }}</a></li>
+                    {% endfor %}
+                </div>
+            </li>
+            {% endif %}
+            {%- endfor -%}
+        </ul>
+        
+        <div class="mt-5">
+          {% if site.development-mode == true %}{% include dramaturgy/setup/modal-button.html %}{% endif %}
+
+      </div>
+
+      </div>
+     
+    </div>
+  </div>

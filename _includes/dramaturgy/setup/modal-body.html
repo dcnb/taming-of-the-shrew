@@ -1,0 +1,268 @@
+<!-- Set up modal -->
+<style>
+    /* Add hover effect to accordion buttons that matches the non-collapsed state */
+    .accordion-button:hover {
+        color: #0c63e4;
+        background-color: #e7f1ff;
+    }
+</style>
+<div class="modal fade" id="cbSetUpModal" tabindex="-1" aria-labelledby="cbSetUpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h1 class="modal-title" id="cbSetUpModalLabel">Welcome to Digital Dramaturgy</h1>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"><span class="visually-hidden">Close</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-4">
+                    <div class="col-md-9">
+                        <h2>Bring playscripts to life with interactive annotations</h2>
+                        <p class="lead">Use the options below you to explore pre-built demo plays, or to load your own
+                            script from the web or your local computer. </p>
+                    </div>
+                    <div class="col-md-3 p-2">
+                        <a href="{{'directions.html' | relative_url}}"
+                            class="btn btn-outline-primary" target="_blank">
+                            <i class="bi bi-gear" aria-hidden="true"></i> Quick Setup Guide
+                        </a>
+                        <br>
+                        <a href="{{'docs.html' | relative_url}}" class="btn btn-outline-secondary mt-3" target="_blank">
+                            <i class="bi bi-book" aria-hidden="true"></i> Documentation
+                        </a>
+                    </div>
+
+                    <div class="col-12">
+
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <p class="card-title h5">Current Configuration</p>
+                                <div id="configured-text">
+                                    <p class="card-text small bg-white">The site is currently using this spreadsheet: <code
+                                            id="current-metadata-csv" class="small"></code></p>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-primary" id="refreshMetadata">Refresh Your
+                                            Data</button>
+                                    </div>
+                                </div>
+                                <div id="nonconfigured-text" style="display: none;">
+                                    <p class="card-text small">The site is not currently loading a script. See below for
+                                        configuration options.
+                                    </p>
+                                    <div class="d-flex gap-2">
+
+                                        <button class="btn btn-sm btn-primary" id="loadFirstDemo"
+                                            style="display: inline-block;">Load our
+                                            <i>A Midsummer Night's Dream</i> Demo</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <h2 class="fs-4">Three Options to Load Play Data</h2>
+                <div class="accordion my-4" id="cbMetadataOptions">
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button fs-4 collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                                <i class="bi bi-play-circle me-2" aria-hidden="true"></i>1. Try a Demo Shakespeare Play
+                            </button>
+                        </h3>
+                        <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#cbMetadataOptions">
+                            <div class="accordion-body">
+                                <p>Explore a pre-annotated Shakespeare play to see Digital Dramaturgy in action:</p>
+                                <div class="mb-3">
+                                    <label for="demoUrl" class="form-label">Select a Demo Play</label>
+                                    <select id="demoUrl" class="form-select form-select-lg"
+                                        onchange="metadata_demo_selector();">
+                                        <option selected>Select a Play</option>
+                                        {% for demo in site.data.demo-links %}
+                                        <option value="{{demo.link}}">{{demo.title}}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="alert alert-success">
+                                    <i class="bi bi-lightbulb" aria-hidden="true"></i> Want to use one of these plays for your own
+                                    annotations? Visit our <a
+                                        href="https://digitaldramaturgy.github.io/docs/setup/spreadsheet/"
+                                        class="alert-link">spreadsheet preparation guide</a> to get started.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button fs-4 collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                <i class="bi bi-google me-2" aria-hidden="true"></i>2. Use Your Google Sheet
+                            </button>
+                        </h3>
+                        <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#cbMetadataOptions">
+                            <div class="accordion-body">
+                                <p>Already have your play prepared in a Google Sheet? Publish it and paste the link
+                                    here:</p>
+                                <form id="metadataUrl" onsubmit="metadata_url_selector(); return false;">
+                                    <div class="mb-3">
+                                        <label for="csvUrl" class="form-label">Google Sheet CSV URL</label>
+                                        <div class="input-group">
+                                            <input type="url" id="csvUrl" class="form-control" pattern="https://.*"
+                                                placeholder="Paste your published Google Sheet URL"
+                                                aria-describedby="csvUrlHelp">
+                                            <button class="btn btn-primary" type="submit">
+                                                Load Play
+                                            </button>
+                                        </div>
+                                        <div id="csvUrlHelp" class="form-text">Enter the full URL of your published Google Sheet in CSV format</div>
+                                    </div>
+                                </form>
+                                <div class="card border-light mb-3">
+                                    <div class="card-header">How to Publish Your Google Sheet</div>
+                                    <div class="card-body">
+                                        <ol class="mb-0">
+                                            <li>In your Google Sheet, click "File" > "Share" > "Publish to the Web"</li>
+                                            <li>Select "Entire Document" and "Comma-separated values (.csv)"</li>
+                                            <li>Click "Publish" and copy the link</li>
+                                        </ol>
+                                        <p class="small ms-5 mb-0">A link will look like: <code
+                                                class="small">https://docs.google.com/spreadsheets/d/e/2PACX-1vTR-PrLzlbvViHiBNVdkzUZ8iPjkw-LMmugCYpNYs0QWkvLmpi6hWXc9_edxYx5D7vAUoG369W4-5wo/pub?output=csv</code>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="alert alert-info">
+                                    <i class="bi bi-link" aria-hidden="true"></i> <strong>Sharing tip:</strong> You can share your work by
+                                    adding your Google Sheet link to the end of our URL like:
+                                    <code>https://digitaldramaturgy.github.io/?play={YOUR-GOOGLE-SHEET-LINK}</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button fs-4 collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                <i class="bi bi-file-earmark-spreadsheet me-2" aria-hidden="true"></i>3. Upload CSV from Your Computer
+                            </button>
+                        </h3>
+                        <div id="collapseThree" class="accordion-collapse collapse" data-bs-parent="#cbMetadataOptions">
+                            <div class="accordion-body">
+                                <p>Have a CSV file on your computer? Upload it directly:</p>
+                                <form id="metadataFile" onsubmit="metadata_file_selector(); return false;">
+                                    <div class="mb-3">
+                                        <label for="csvFile" class="form-label">Select CSV File</label>
+                                        <div class="input-group">
+                                            <input type="file" accept=".csv" id="csvFile" class="form-control"
+                                                aria-describedby="csvFileHelp">
+                                            <button class="btn btn-primary" type="submit">
+                                                Load Play
+                                            </button>
+                                        </div>
+                                        <div id="csvFileHelp" class="form-text">Choose a CSV file from your computer containing play data</div>
+                                    </div>
+                                </form>
+                                <div class="card border-light">
+                                    <div class="card-header">How to Download from Google Sheets</div>
+                                    <div class="card-body">
+                                        <ol class="mb-0">
+                                            <li>In your Google Sheet, click "File" > "Download" > "Comma Separated
+                                                Values (.csv)"</li>
+                                            <li>Upload the downloaded file using the form above</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info small mt-4" role="region" aria-label="Important information about data storage">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                        class="bi bi-info-square" viewBox="0 0 16 16" aria-hidden="true">
+                        <path
+                            d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z" />
+                        <path
+                            d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0" />
+                    </svg> Site Data for Digital Dramaturgy projects is stored in your browser's Session
+                    Storage, so sites built using these options will remain only until you close your browser! 
+                    <ul>
+                        <li>For a permanent site,
+                            <a href="{{'directions.html#step-4-setup-your-own-github-repository-to-publish-your-annotated-playscript' | relative_url}}"
+                                class="alert-link">follow our directions</a>.
+                        </li>
+                        <li>If you're using a Google Sheet, you can also <a href="{{ 'directions.html#share-your-temporary-site'| relative_url }}" class="alert-link">share a temporary site</a> so others can see your annotations.</li>
+                    </ul>
+                </div>
+
+                <div class="row mt-5 d-none">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <p class="card-title h4"><i class="bi bi-mortarboard" aria-hidden="true"></i> For Educators</p>
+                                <p class="card-text">Create collaborative annotation projects for drama courses,
+                                    allowing students to contribute research and analysis to a shared digital edition.
+                                </p>
+                                <a href="https://digitaldramaturgy.github.io/docs/examples/"
+                                    class="btn btn-sm btn-outline-primary">See Classroom Examples</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <p class="card-title h4"><i class="bi bi-theatre" aria-hidden="true"></i> For Theater Companies</p]>
+                                <p class="card-text">Preserve dramaturgical research, performance notes, and production
+                                    insights as a lasting digital resource.</p>
+                                <a href="https://digitaldramaturgy.github.io/docs/features/"
+                                    class="btn btn-sm btn-outline-primary">Explore Features</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-5">
+                    <p><strong>Ready to create your own Digital Dramaturgy site?</strong> Select "Use This Template" at
+                        the top of Our GitHub Repository.</p>
+                    <a href="https://www.github.com/digitaldramaturgy/digitaldramaturgy.github.io/"
+                        class="btn btn-lg btn-success">Set Up Your GitHub Repository <svg
+                            xmlns="http://www.w3.org/2000/svg" width="16" height="20" fill="currentColor"
+                            class="bi bi-github" viewBox="0 0 16 16" aria-hidden="true">
+                            <path
+                                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add refresh metadata function -->
+<script>
+    document.getElementById('refreshMetadata').addEventListener('click', function () {
+        reset_dd_items();
+    });
+
+    // Check if metadata is empty in session storage and show the Try Demo button if so
+    document.addEventListener('DOMContentLoaded', function () {
+        const metadataCSV = sessionStorage.getItem('dd_metadata_csv');
+        const configuredText = document.getElementById('configured-text');
+        const nonconfiguredText = document.getElementById('nonconfigured-text');
+
+        // Show the button if metadata is empty or null in session storage
+        if (!metadataCSV || metadataCSV === '') {
+            nonconfiguredText.style.display = 'block';
+            configuredText.style.display = 'none';
+        }
+
+        // Add click event to load the first demo
+        document.getElementById('loadFirstDemo').addEventListener('click', function () {
+            const demoSelect = document.getElementById('demoUrl');
+            if (demoSelect && demoSelect.options.length > 1) {
+                // Select the first actual demo (index 1, since index 0 is "Select a Play")
+                demoSelect.selectedIndex = 1;
+                // Trigger the change event to load the selected demo
+                metadata_demo_selector();
+            }
+        });
+    });
+</script>
