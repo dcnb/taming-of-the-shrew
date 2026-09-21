@@ -2,7 +2,7 @@
 
 # Digital Dramaturgy
 
-_Digital Dramaturgy_ enables the publication of annotated and/or edited playscripts that can be used as collaborative educational activities in classrooms or as dramaturgical aids for dramatic presentations.
+Project 
 
 ## Quick Start Guide
 
