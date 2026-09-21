@@ -16,14 +16,14 @@
 #       -- e.g., /assets/data/play_example.csv
 #    - or a link to a CSV file stored somewhere accessible on the internet 
 #       -- e.g., https://example.com/play_example.csv)
-play: 
+play: https://docs.google.com/spreadsheets/d/e/2PACX-1vRohIkDeymM27-67ZtKopxMPHzbvSHCR7uBHNG9Dyjb6FiogXZiwdYpJpR2G60dBtRXrrW1nq0imSiB/pub?output=csv
 # dev mode turns on ability to change metadata; when you're finished with this project, set this to false
 development-mode: true
 
 ##########
 # Site SETTINGS
 # Site
-title: Digital Dramaturgy
+title: Taming of the Shrew
 # description appears in meta tags and other locations
 # this description might appear in search result lists, keep around 160 characters max
 description: # put something like "a collaborative annotation of "
